@@ -1,5 +1,12 @@
 ## Project: Next.js 15 (App Router) + Trigger.dev + Puppeteer
 
+# Important: Implementation Guide Reference
+Please refer to `docs/implementation.mdx` for the complete project architecture, implementation details, and data flow. This document contains:
+- Project objectives and high-level architecture
+- Tools and services integration details
+- Implementation guidelines for each component
+- Data flow diagrams and sequence flows
+
 These rules customize the AI's behavior in this project to maintain a consistent coding style, follow best practices, and ensure high-quality output.
 
 ---
@@ -72,12 +79,12 @@ These rules customize the AI's behavior in this project to maintain a consistent
    - Summarize complex logic (e.g., BFS crawling steps, LLM prompt flows) with brief comment blocks.
 
 2. **README & Guides**  
-   - Keep the project’s main **README.md** updated with instructions on setup, environment variables, and how to run/deploy the Next.js + Trigger.dev environment.
+   - Keep the project's main **README.md** updated with instructions on setup, environment variables, and how to run/deploy the Next.js + Trigger.dev environment.
    - Provide usage examples for scraping and FAQ generation, especially highlighting any proxy or API keys needed.
 
 3. **API References**  
    - Document server actions in a top-level reference if they are exposed or commonly used by the front-end.
-   - Maintain a “How it Works” section describing the data flow from user input → server action → Trigger.dev task → LLM → database → final output.
+   - Maintain a "How it Works" section describing the data flow from user input → server action → Trigger.dev task → LLM → database → final output.
 
 ---
 
