@@ -1,0 +1,115 @@
+## Project: Next.js 15 (App Router) + Trigger.dev + Puppeteer
+
+These rules customize the AI's behavior in this project to maintain a consistent coding style, follow best practices, and ensure high-quality output.
+
+---
+
+## 1. **Coding Standards**
+
+1. **TypeScript**  
+   - All new files must be written in `.ts` or `.tsx`.
+   - Always use explicit types for function parameters and return values unless they are trivially inferred.
+   - Enable `strict` mode in `tsconfig.json`.
+
+2. **Next.js 15 + App Router**  
+   - Use the **App Router** (in `app/` directory) rather than the legacy `pages/` directory.
+   - Favor **Server Actions** over traditional API Routes when possible.
+   - Keep server-side logic (e.g., scraping triggers, database writes) inside server actions or separate server utility files.
+
+3. **Trigger.dev Integration**  
+   - Define Trigger.dev tasks/jobs in the `trigger/` folder.
+   - Use `@trigger.dev/sdk` for dispatching background jobs (e.g. `dispatch()`).
+   - Keep scraping logic or LLM calls in separate utility modules to maintain clean separation of concerns.
+
+4. **Puppeteer**  
+   - Use `puppeteer-core` with a proxy if scraping sites we do not own (per Trigger.dev guidelines).
+   - When scraping multiple pages, implement BFS/DFS logic responsibly (avoid infinite loops).
+   - Abstract repetitive or shared scraping logic in helper functions or classes.
+
+---
+
+
+## 2. **Best Practices**
+
+1. **Server Actions & Background Work**  
+   - Keep server actions minimal. Offload heavy tasks to Trigger.dev tasks for maintainability and to avoid timeouts.
+   - Return descriptive types for server actions (e.g., returning structured objects with `status`, `data`, or `error`).
+
+2. **Scraping & Security**  
+   - Always check `maxPages` or define a depth limit to prevent excessive crawling.
+   - Ensure you have permission or use proxies (like Browserbase) when crawling 3rd-party sites.
+   - Store only necessary data from pages and sanitize all user inputs.
+
+3. **LLM Integration**  
+   - Use chunking if input text is large.
+   - Clearly separate prompt engineering logic to a dedicated utility (e.g., `faqGenerator.ts`).
+   - Cache or store repeated requests/responses to reduce token usage.
+
+4. **Performance**  
+   - Where possible, memoize or cache heavy computations.
+   - For large-scale scraping, consider pagination or partial runs with queueing strategies.
+
+---
+
+## 3. **Testing & QA**
+
+1. **Unit & Integration Tests**  
+   - Write tests for all critical logic (e.g., BFS crawler, LLM prompt logic, data transforms).
+   - Aim for **80%+** coverage on utility functions (e.g. in `lib/` or `trigger/` modules).
+   - For Next.js components, test with React Testing Library or Cypress for integration/E2E.
+
+2. **Edge Cases**  
+   - Test partial site scrapes (few pages).
+   - Test handling of unavailable sites or potential infinite loop detection.
+   - Test scenarios with chunked LLM prompts (if text exceeds token limits).
+
+---
+
+## 4. **Documentation & Comments**
+
+1. **Code Comments**  
+   - Use **JSDoc**-style comments for all public functions, describing parameters and return types.
+   - Summarize complex logic (e.g., BFS crawling steps, LLM prompt flows) with brief comment blocks.
+
+2. **README & Guides**  
+   - Keep the project’s main **README.md** updated with instructions on setup, environment variables, and how to run/deploy the Next.js + Trigger.dev environment.
+   - Provide usage examples for scraping and FAQ generation, especially highlighting any proxy or API keys needed.
+
+3. **API References**  
+   - Document server actions in a top-level reference if they are exposed or commonly used by the front-end.
+   - Maintain a “How it Works” section describing the data flow from user input → server action → Trigger.dev task → LLM → database → final output.
+
+---
+
+## 5. **Deployment & Environment**
+
+1. **Vercel / Hosting**  
+   - Confirm that **Puppeteer** dependencies or proxy connections are supported.
+   - Use environment variables for sensitive info (e.g., `TRIGGER_API_KEY`, `OPENAI_API_KEY`).
+
+2. **Supabase Integration**  
+   - If using Supabase for DB/Auth, ensure row-level security policies are correct.
+   - Use minimal columns to store user data and FAQs.
+
+3. **Stripe or Payment**  
+   - If monetizing, properly integrate Stripe webhooks in a secure manner (e.g., separate route or server action).
+   - Guard scraping actions behind subscription or credit checks.
+
+---
+
+## 6. **Accessiblity & Responsiveness**
+
+1. **UI Components**  
+   - Use semantic HTML and accessible attributes (e.g., `aria-*`).
+   - Ensure forms, buttons, and modals are keyboard-friendly and screen-reader compliant.
+
+2. **Responsive Layout**  
+   - Prefer utility-based styling (e.g., Tailwind) or a consistent design system.
+   - Test layout on both mobile and desktop devices.
+
+---
+
+## 7. **Conclusion**
+
+- Keep code modular, well-documented, and thoroughly tested.
+- Prioritize security, performance, and user experience throughout the Next.js + Trigger.dev + Puppeteer architecture.

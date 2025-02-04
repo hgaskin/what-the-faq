@@ -1,0 +1,93 @@
+---
+title: "FAQ Generation & Multi-Page Crawler Project"
+description: "Architecture and Implementation Plan"
+---
+
+# FAQ Generation & Multi-Page Crawler Project
+
+This document outlines the **objectives**, **tools**, and **implementation** details for building a Next.js application that scrapes multiple pages of a website, generates FAQs using an LLM, and offloads long-running processes via Trigger.dev. The approach below is designed for **Next.js 15** (hypothetical future version or latest stable Next.js features), integrating **Puppeteer** for web scraping.
+
+---
+
+## 1. Project Objectives
+
+1. **Website URL Submission**  
+   Users enter a domain or URL, initiating a background job to scrape multiple pages of that website.
+
+2. **Multi-Page Content Extraction**  
+   Using Puppeteer, navigate across a site (following internal links or sitemaps) to gather textual content.
+
+3. **FAQ Generation**  
+   Pass the extracted text (or a summarized version) to an LLM (e.g., OpenAI or FAL.ai) to generate FAQ pairs.
+
+4. **Scalable & Reliable Execution**  
+   Offload heavy/larger tasks to a background job system (Trigger.dev) so they can run beyond typical serverless timeouts.
+
+5. **Report & Store**  
+   - Save the FAQ data in a database (e.g., Supabase).  
+   - Present real-time or near-real-time progress updates to the user.
+
+---
+
+## 2. Tools & Services
+
+### 2.1 Next.js (App Router & Server Actions)
+
+- **Version**: Next.js 15 (or 13+ with the new App Router).
+- **Role**:  
+  - Provide the user interface and handle user input.  
+  - Use Server Actions to securely trigger the background tasks.  
+  - Render the final FAQ results or real-time job statuses.
+
+### 2.2 Trigger.dev
+
+- **Role**: Orchestration of long-running processes and asynchronous tasks.  
+- **Implementation**:
+  - Define tasks in `trigger/` folder as code (`task()`, `job()`).  
+  - Use `dispatch()` or `callTrigger()` from Next.js Server Actions to start background jobs.  
+  - Store logs, track progress, and potentially provide real-time job updates.
+
+### 2.3 Puppeteer
+
+- **Role**: Actual headless browser scraping.  
+- **Implementation**:
+  - **Multi-page navigation** using a queue or BFS approach.  
+  - Page content extraction with `page.evaluate()` to return text.  
+  - Must use a **proxy** (like Browserbase, Browserless, etc.) if scraping sites you do not own.
+
+### 2.4 LLM (OpenAI / FAL.ai)
+
+- **Role**: Convert extracted text into FAQ question-answer pairs.  
+- **Implementation**:
+  - Summarize or chunk site text to fit token limits.  
+  - Possibly store embeddings in a vector database (optional advanced feature).
+
+### 2.5 Supabase (Optional)
+
+- **Role**: Database & user authentication.  
+- **Implementation**:
+  - Store user data, FAQ results, usage logs.  
+  - Provide row-level security (RLS) if needed.  
+  - Alternatively, store data in any Postgres/MySQL/NoSQL DB you prefer.
+
+### 2.6 Stripe (Optional)
+
+- **Role**: Payment system if you plan to charge for usage.  
+- **Implementation**:
+  - Manage subscription or credit-based plans.  
+  - On each server action, verify the user has sufficient credits/subscription to initiate a new scrape.
+
+---
+
+## 3. High-Level Architecture
+
+```mermaid
+flowchart LR
+    A[User enters domain<br>in Next.js UI] --> B(Server Action)
+    B -->|dispatch Task| C[Trigger.dev<br>Puppeteer Task]
+    C -->|Scrapes multiple pages| D{Collected Text}
+    D -->|Generate Q&A| E[LLM (OpenAI/FAL)]
+    E -->|FAQ Data| F(DB - Supabase)
+    F --> C
+    C -->|Job finishes| G[Return status/result<br>to Next.js]
+    G -->|Display final FAQ| A
