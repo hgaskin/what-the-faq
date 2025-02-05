@@ -91,3 +91,170 @@ flowchart LR
     F --> C
     C -->|Job finishes| G[Return status/result<br>to Next.js]
     G -->|Display final FAQ| A
+```
+
+# FAQ Generation Implementation
+
+## 1. Architecture Overview
+
+### Tasks & Data Flow
+1. **Web Scraping Task**
+   - Input: Website URL, max pages to scrape
+   - Process: BFS/DFS crawling with Puppeteer
+   - Output: Array of scraped pages with content
+   - Storage: Temporary results in Supabase
+
+2. **FAQ Generation Task**
+   - Input: Scraped content from previous task
+   - Process: LLM-based FAQ generation with OpenAI
+   - Output: Structured FAQs with source attribution
+   - Storage: Final FAQs in Supabase
+
+### Task Separation Benefits
+- Independent scaling and retry logic
+- Clear separation of concerns
+- Reusable FAQ generation for other content sources
+- Better error handling and monitoring
+
+## 2. Tools & Services
+
+### 2.1 Next.js (App Router & Server Actions)
+- **Version**: Next.js 15 (or 13+ with App Router)
+- **Role**:  
+  - Provide the user interface and handle user input
+  - Use Server Actions to trigger background tasks
+  - Render the final FAQ results or real-time job statuses
+
+### 2.2 Trigger.dev
+- **Role**: Orchestration of long-running processes
+- **Implementation**:
+  - Separate tasks in `trigger/` folder:
+    1. `scrape-website.ts`: Web scraping task
+    2. `generate-faq.ts`: FAQ generation task
+  - Each task has its own retry logic and error handling
+  - Progress tracking via Trigger.dev events
+
+### 2.3 Vercel AI SDK
+- **Role**: LLM integration and streaming responses
+- **Implementation**:
+  - Use `@ai-sdk/openai` for OpenAI integration
+  - Streaming API routes for real-time generation
+  - Proper prompt engineering for FAQ generation
+
+### 2.4 Puppeteer
+- **Role**: Web scraping with proxy support
+- **Implementation**:
+  - Use `puppeteer-core` with Browserbase proxy
+  - BFS/queue-based crawling with depth limits
+  - Content extraction with proper selectors
+
+## 3. Data Models
+
+### 3.1 Scraped Content
+```typescript
+interface ScrapedPage {
+  url: string;
+  title: string;
+  content: string;
+  headings: string[];
+  links: string[];
+}
+```
+
+### 3.2 FAQ Output
+```typescript
+interface FAQ {
+  question: string;
+  answer: string;
+  confidence: number;
+  sourceUrl: string;
+  sourcePage: string;
+}
+```
+
+## 4. Task Flow
+
+1. **User Initiates Process**
+   ```typescript
+   // Server Action
+   async function startFAQGeneration(url: string) {
+     // Trigger first task
+     const scrapeHandle = await tasks.trigger("scrape-website", { url });
+     return scrapeHandle;
+   }
+   ```
+
+2. **Web Scraping Task**
+   ```typescript
+   // trigger/scrape-website.ts
+   export const scrapeWebsiteTask = task({
+     id: "scrape-website",
+     run: async (payload) => {
+       // Scrape website
+       const pages = await scrapeWebsite(payload.url);
+       // Store results
+       const scrapeId = await storeScrapedContent(pages);
+       // Trigger FAQ generation
+       return tasks.trigger("generate-faq", { scrapeId });
+     }
+   });
+   ```
+
+3. **FAQ Generation Task**
+   ```typescript
+   // trigger/generate-faq.ts
+   export const generateFAQTask = task({
+     id: "generate-faq",
+     run: async (payload) => {
+       // Get scraped content
+       const pages = await getScrapedContent(payload.scrapeId);
+       // Generate FAQs using AI SDK
+       const faqs = await generateFAQs(pages);
+       // Store results
+       return storeFAQs(faqs);
+     }
+   });
+   ```
+
+## 5. Best Practices
+
+### 5.1 Error Handling
+- Implement proper retry logic for each task
+- Store intermediate results to prevent data loss
+- Use structured error responses
+
+### 5.2 Progress Tracking
+- Emit progress events from each task
+- Store task status in database
+- Real-time updates via UI
+
+### 5.3 Resource Management
+- Implement proper cleanup in Puppeteer
+- Handle rate limiting for APIs
+- Monitor token usage for OpenAI
+
+### 5.4 Security
+- Validate all user inputs
+- Use environment variables for secrets
+- Implement proper access controls
+
+## 6. Monitoring & Debugging
+
+### 6.1 Logging
+- Use structured logging in tasks
+- Track key metrics (pages scraped, tokens used)
+- Monitor error rates and types
+
+### 6.2 Development
+- Local development with proper env setup
+- Testing tools and mock data
+- Debug mode for detailed logs
+
+## 7. Future Improvements
+
+- Implement caching for scraped content
+- Add support for more content sources
+- Enhance FAQ quality with better prompts
+- Add support for incremental updates
+
+---

@@ -1,27 +1,12 @@
 import puppeteer from 'puppeteer-core';
+import { Browser } from 'puppeteer-core';
 import dotenv from 'dotenv';
 import { URL } from 'url';
 
 /**
  * Web Scraper for FAQ Generation
  * 
- * Current Status: Basic content extraction working well.
- * 
- * Potential Future Optimizations:
- * 1. Enhanced Content Organization:
- *    - Add structured fields for FAQ-relevant content
- *    - Extract existing FAQs, product info, problem statements
- *    - Identify benefits and pricing information
- * 
- * 2. Smarter Content Extraction:
- *    - Look for FAQ-specific sections and schema.org markup
- *    - Identify question-like content
- *    - Extract structured data
- * 
- * 3. Priority-based Crawling:
- *    - Prioritize FAQ, About, Product, and Support pages
- *    - Improve page relationship tracking
- *    - Better handling of navigation structure
+ * Uses puppeteer-core for compatibility with Trigger.dev and Browserbase
  */
 
 // Load environment variables
@@ -35,29 +20,46 @@ export interface ScrapedPage {
   links: string[];
 }
 
-export type ProgressCallback = (pagesScraped: number) => Promise<void>;
+export interface ScrapeOptions {
+  maxPages?: number;
+  siteOwner?: boolean;
+  onProgress?: (pagesScraped: number) => Promise<void>;
+}
+
+async function initializeBrowser(siteOwner: boolean): Promise<Browser> {
+  if (siteOwner) {
+    // For owned sites, connect to local Chrome instance
+    return await puppeteer.connect({
+      browserURL: 'http://localhost:9222'
+    });
+  } else {
+    // For non-owned sites, use Browserbase
+    if (!process.env.BROWSERBASE_API_KEY) {
+      throw new Error('BROWSERBASE_API_KEY environment variable is required for non-owned sites');
+    }
+
+    return await puppeteer.connect({
+      browserWSEndpoint: `wss://connect.browserbase.com?apiKey=${process.env.BROWSERBASE_API_KEY}`,
+    });
+  }
+}
 
 export async function scrapeWebsite(
-  startUrl: string, 
-  maxPages: number = 5,
-  onProgress?: ProgressCallback
-) {
-  if (!process.env.BROWSERBASE_API_KEY) {
-    throw new Error('BROWSERBASE_API_KEY environment variable is required');
-  }
+  startUrl: string,
+  options: ScrapeOptions = {}
+): Promise<ScrapedPage[]> {
+  const {
+    maxPages = 5,
+    siteOwner = false,
+    onProgress
+  } = options;
 
-  console.log(`Starting scrape of: ${startUrl}`);
+  console.log(`Starting scrape of: ${startUrl} (${siteOwner ? 'owned site' : 'using proxy'})`);
   const visited = new Set<string>();
   const queue: { url: string; depth: number }[] = [];
   const results: ScrapedPage[] = [];
 
-  const browser = await puppeteer.connect({
-    browserWSEndpoint: `wss://connect.browserbase.com?apiKey=${process.env.BROWSERBASE_API_KEY}`,
-    defaultViewport: {
-      width: 1920,
-      height: 1080
-    }
-  });
+  const browser = await initializeBrowser(siteOwner);
 
   try {
     queue.push({ url: startUrl, depth: 0 });
@@ -96,11 +98,15 @@ export async function scrapeWebsite(
             'main, article, [role="main"], #main-content, #content, .content, .main-content'
           );
           
-          if (mainContent) {
-            return mainContent.textContent?.trim() || '';
+          // Properly type cast to HTMLElement
+          const mainContentElement = mainContent as HTMLElement | null;
+          const bodyElement = document.body as HTMLElement;
+          
+          if (mainContentElement) {
+            return mainContentElement.innerText.trim();
           }
 
-          return document.body.textContent?.trim() || '';
+          return bodyElement.innerText.trim();
         });
 
         const title = await page.title();
@@ -152,23 +158,14 @@ export async function scrapeWebsite(
             console.error(`Error processing link ${link}:`, error);
           }
         }
-
       } catch (error) {
         console.error(`Error scraping ${currentUrl}:`, error);
       }
-      await page.close();
     }
-
-    console.log('\n=== Scraping Complete ===');
-    console.log(`Total pages scraped: ${results.length}`);
-    console.log(`Unique URLs found: ${visited.size}`);
 
     return results;
 
-  } catch (error) {
-    console.error('Fatal error:', error);
-    throw error;
   } finally {
     await browser.close();
   }
-} 
+}
