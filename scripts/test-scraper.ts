@@ -27,7 +27,7 @@ import { URL } from 'url';
 // Load environment variables
 dotenv.config({ path: '.env.local' });
 
-interface ScrapedPage {
+export interface ScrapedPage {
   url: string;
   title: string;
   content: string;
@@ -35,7 +35,13 @@ interface ScrapedPage {
   links: string[];
 }
 
-async function scrapeWebsite(startUrl: string, maxPages: number = 5) {
+export type ProgressCallback = (pagesScraped: number) => Promise<void>;
+
+export async function scrapeWebsite(
+  startUrl: string, 
+  maxPages: number = 5,
+  onProgress?: ProgressCallback
+) {
   if (!process.env.BROWSERBASE_API_KEY) {
     throw new Error('BROWSERBASE_API_KEY environment variable is required');
   }
@@ -68,19 +74,13 @@ async function scrapeWebsite(startUrl: string, maxPages: number = 5) {
       const page = await browser.newPage();
       
       try {
-        // Set a proper user agent
         await page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36');
         await page.setDefaultNavigationTimeout(30000);
 
-        // Navigate to the page
         await page.goto(currentUrl, { waitUntil: 'networkidle0' });
-
-        // Wait for content to load
         await page.waitForSelector('body');
 
-        // Extract content with improved selectors
         const content = await page.evaluate(() => {
-          // Remove noise first
           const elementsToRemove = [
             'script',
             'style',
@@ -92,7 +92,6 @@ async function scrapeWebsite(startUrl: string, maxPages: number = 5) {
             document.querySelectorAll(selector).forEach(el => el.remove());
           });
 
-          // Try to find main content
           const mainContent = document.querySelector(
             'main, article, [role="main"], #main-content, #content, .content, .main-content'
           );
@@ -101,27 +100,23 @@ async function scrapeWebsite(startUrl: string, maxPages: number = 5) {
             return mainContent.textContent?.trim() || '';
           }
 
-          // Fallback to body content
           return document.body.textContent?.trim() || '';
         });
 
         const title = await page.title();
         
-        // Extract headings
         const headings = await page.evaluate(() => {
           return Array.from(document.querySelectorAll('h1, h2, h3'))
             .map(h => h.textContent?.trim())
             .filter(Boolean) as string[];
         });
 
-        // Extract links
         const links = await page.evaluate(() => {
           return Array.from(document.querySelectorAll('a[href]'))
             .map(a => a.getAttribute('href'))
             .filter(Boolean) as string[];
         });
 
-        // Store the scraped page
         results.push({
           url: currentUrl,
           title,
@@ -130,13 +125,15 @@ async function scrapeWebsite(startUrl: string, maxPages: number = 5) {
           links: links.filter(Boolean),
         });
 
-        // Log progress
+        if (onProgress) {
+          await onProgress(results.length);
+        }
+
         console.log(`Successfully scraped: ${title}`);
         console.log(`Content length: ${content.length} characters`);
         console.log(`Found ${headings.length} headings`);
         console.log(`Found ${links.length} links`);
 
-        // Process links
         for (const link of links) {
           try {
             const absoluteUrl = new URL(link, currentUrl).href;
@@ -158,9 +155,8 @@ async function scrapeWebsite(startUrl: string, maxPages: number = 5) {
 
       } catch (error) {
         console.error(`Error scraping ${currentUrl}:`, error);
-      } finally {
-        await page.close();
       }
+      await page.close();
     }
 
     console.log('\n=== Scraping Complete ===');
@@ -175,28 +171,4 @@ async function scrapeWebsite(startUrl: string, maxPages: number = 5) {
   } finally {
     await browser.close();
   }
-}
-
-// Get URL from command line arguments
-const url = process.argv[2];
-if (!url) {
-  console.error('Error: Please provide a URL to scrape');
-  console.error('Usage: npm run test-scraper <url>');
-  process.exit(1);
-}
-
-// Run the scraper
-scrapeWebsite(url)
-  .then(results => {
-    console.log('\nScraped Pages:');
-    results.forEach((page, index) => {
-      console.log(`\n[${index + 1}] ${page.title}`);
-      console.log(`URL: ${page.url}`);
-      console.log(`Content preview: ${page.content.slice(0, 150)}...`);
-      console.log('Headings:', page.headings.join(', '));
-    });
-  })
-  .catch(error => {
-    console.error('Error:', error);
-    process.exit(1);
-  }); 
+} 

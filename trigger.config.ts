@@ -1,4 +1,5 @@
 import { defineConfig } from "@trigger.dev/sdk/v3";
+import { puppeteer } from "@trigger.dev/build/extensions/puppeteer";
 
 export default defineConfig({
   project: "proj_qbptilbjnupugwvwceyj",
@@ -19,4 +20,8 @@ export default defineConfig({
     },
   },
   dirs: ["./trigger"],
+  build: {
+    // Required to use the Puppeteer library
+    extensions: [puppeteer()],
+  },
 });

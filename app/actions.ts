@@ -4,6 +4,8 @@ import { encodedRedirect } from "@/utils/utils";
 import { createClient } from "@/utils/supabase/server";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import type { scrapeWebsiteTask } from "@/trigger/scrape-website";
+import { tasks } from "@trigger.dev/sdk/v3";
 
 export const signUpAction = async (formData: FormData) => {
   const email = formData.get("email")?.toString();
@@ -132,3 +134,19 @@ export const signOutAction = async () => {
   await supabase.auth.signOut();
   return redirect("/sign-in");
 };
+
+export async function triggerScrape(url: string, maxPages: number = 5) {
+  try {
+    const handle = await tasks.trigger<typeof scrapeWebsiteTask>("scrape-website", {
+      url,
+      maxPages,
+    });
+
+    return { handle };
+  } catch (error) {
+    console.error(error);
+    return {
+      error: "Failed to start scraping task",
+    };
+  }
+}
